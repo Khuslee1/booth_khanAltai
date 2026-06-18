@@ -6,7 +6,8 @@ import {
   Environment,
   Lightformer,
 } from "@react-three/drei";
-import { useEffect, type ElementRef, type RefObject } from "react";
+import { useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, type ElementRef, type RefObject } from "react";
 import BoothModel from "./BoothModel";
 import { M } from "./specs";
 
@@ -23,38 +24,62 @@ export const VIEWS: { key: ViewKey; label: string }[] = [
 const H = M.height;
 
 // Each preset: [camX, camY, camZ, targetX, targetY, targetZ]
+// Distances are pulled back so the whole booth stays framed with margin.
 const PRESETS: Record<ViewKey, [number, number, number, number, number, number]> = {
-  hero: [2.4, 1.75, 2.7, 0, H * 0.45, 0],
-  front: [0, 1.15, 3.3, 0, 1.0, 0],
-  side: [3.2, 1.2, 0.3, 0, 1.0, 0],
-  top: [0.01, 4.4, 0.5, 0, 0.5, 0],
-  interior: [0.0, 1.35, 0.45, -0.2, 0.7, -0.6],
+  hero: [3.6, 2.2, 4.0, 0, H * 0.45, 0],
+  front: [0, 1.2, 4.6, 0, 1.05, 0],
+  side: [4.6, 1.35, 0.2, 0, 1.05, 0],
+  top: [0.01, 6.0, 0.7, 0, 0.4, 0],
+  interior: [0.0, 1.55, 1.05, -0.15, 0.75, -0.6],
 };
 
 export type ControlsRef = RefObject<ElementRef<typeof CameraControls> | null>;
 
-/** Animate the camera to a named preset view. */
-export function applyView(controls: ControlsRef["current"], key: ViewKey, transition = true) {
+/**
+ * Animate the camera to a named preset view.
+ * `fit` pulls the camera back (>1) so narrow/portrait screens still frame the
+ * whole booth — the camera→target distance is scaled around the target point.
+ */
+export function applyView(
+  controls: ControlsRef["current"],
+  key: ViewKey,
+  transition = true,
+  fit = 1,
+) {
   if (!controls) return;
   const [px, py, pz, tx, ty, tz] = PRESETS[key];
-  controls.setLookAt(px, py, pz, tx, ty, tz, transition);
+  const cx = tx + (px - tx) * fit;
+  const cy = ty + (py - ty) * fit;
+  const cz = tz + (pz - tz) * fit;
+  controls.setLookAt(cx, cy, cz, tx, ty, tz, transition);
 }
 
 export default function Scene({
   controlsRef,
+  activeView,
   doorOpen,
   curtainOpen,
   onToggleDoor,
 }: {
   controlsRef: ControlsRef;
+  activeView: ViewKey;
   doorOpen: boolean;
   curtainOpen: boolean;
   onToggleDoor: () => void;
 }) {
-  // Set the opening hero view once the controls mount.
+  // Pull-back factor based on the canvas aspect ratio (more for portrait/phone).
+  const size = useThree((s) => s.size);
+  const fit = useMemo(() => {
+    const aspect = size.width / size.height;
+    return aspect >= 1 ? 1 : Math.min(2.4, Math.max(1, 1 / aspect));
+  }, [size.width, size.height]);
+
+  // Re-frame whenever the chosen view or the screen aspect changes.
+  const firstRef = useRef(true);
   useEffect(() => {
-    applyView(controlsRef.current, "hero", false);
-  }, [controlsRef]);
+    applyView(controlsRef.current, activeView, !firstRef.current, fit);
+    firstRef.current = false;
+  }, [activeView, fit, controlsRef]);
 
   return (
     <>

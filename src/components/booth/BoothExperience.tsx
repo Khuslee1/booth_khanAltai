@@ -3,12 +3,7 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 import * as THREE from "three";
-import Scene, {
-  applyView,
-  VIEWS,
-  type ControlsRef,
-  type ViewKey,
-} from "./Scene";
+import Scene, { VIEWS, type ControlsRef, type ViewKey } from "./Scene";
 import { SPEC_GROUPS, SPEC_NOTE } from "./specs";
 
 function CanvasLoader() {
@@ -27,10 +22,10 @@ export default function BoothExperience() {
   const [activeView, setActiveView] = useState<ViewKey>("hero");
   const [doorOpen, setDoorOpen] = useState(false);
   const [curtainOpen, setCurtainOpen] = useState(true);
+  const [specOpen, setSpecOpen] = useState(false);
 
   const handleView = (key: ViewKey) => {
     setActiveView(key);
-    applyView(controlsRef.current, key);
   };
 
   return (
@@ -38,7 +33,7 @@ export default function BoothExperience() {
       {/* 3D viewer pane */}
       <div className="relative flex-1">
         <Canvas
-          shadows
+          shadows="percentage"
           dpr={[1, 2]}
           gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
           camera={{ position: [2.4, 1.75, 2.7], fov: 42, near: 0.1, far: 100 }}
@@ -46,6 +41,7 @@ export default function BoothExperience() {
           <Suspense fallback={null}>
             <Scene
               controlsRef={controlsRef}
+              activeView={activeView}
               doorOpen={doorOpen}
               curtainOpen={curtainOpen}
               onToggleDoor={() => setDoorOpen((v) => !v)}
@@ -79,13 +75,21 @@ export default function BoothExperience() {
           </button>
         </div>
 
-        {/* Preset view buttons */}
-        <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-wrap justify-center gap-2 rounded-full border border-black/5 bg-white/70 px-2 py-2 shadow-sm backdrop-blur-md">
+        {/* Mobile: open the spec drawer (hidden on desktop, where it's always shown) */}
+        <button
+          onClick={() => setSpecOpen(true)}
+          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#3a322b] px-5 py-2 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#4a4138] lg:hidden"
+        >
+          Үзүүлэлт ▲
+        </button>
+
+        {/* Preset view buttons — single scrollable row (lifted above the spec button on phones) */}
+        <div className="absolute bottom-20 left-1/2 flex max-w-[94%] -translate-x-1/2 flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-black/5 bg-white/70 px-1.5 py-1.5 shadow-sm backdrop-blur-md lg:bottom-5 lg:max-w-none lg:gap-2 lg:px-2">
           {VIEWS.map((v) => (
             <button
               key={v.key}
               onClick={() => handleView(v.key)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors lg:px-4 lg:text-sm ${
                 activeView === v.key
                   ? "bg-[#3a322b] text-white"
                   : "text-[#5d5247] hover:bg-black/5"
@@ -102,9 +106,33 @@ export default function BoothExperience() {
         </div>
       </div>
 
-      {/* Spec panel */}
-      <aside className="w-full shrink-0 overflow-y-auto border-t border-black/10 bg-[#f6f3ee] lg:h-dvh lg:w-[340px] lg:border-l lg:border-t-0">
-        <div className="p-6">
+      {/* Mobile backdrop when the drawer is open */}
+      {specOpen && (
+        <div
+          onClick={() => setSpecOpen(false)}
+          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+        />
+      )}
+
+      {/* Spec panel — slide-up drawer on phones, static sidebar on desktop */}
+      <aside
+        className={`fixed inset-x-0 bottom-0 z-30 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t border-black/10 bg-[#f6f3ee] shadow-[0_-8px_30px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-out ${
+          specOpen ? "translate-y-0" : "translate-y-full"
+        } lg:static lg:z-auto lg:h-dvh lg:max-h-none lg:w-[340px] lg:shrink-0 lg:translate-y-0 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none`}
+      >
+        {/* Mobile drag handle + close button */}
+        <div className="sticky top-0 z-10 flex items-center justify-center bg-[#f6f3ee] pt-3 lg:hidden">
+          <div className="h-1.5 w-12 rounded-full bg-black/15" />
+          <button
+            onClick={() => setSpecOpen(false)}
+            aria-label="Хаах"
+            className="absolute right-3 top-1.5 rounded-full p-2 text-[#5d5247] transition-colors hover:bg-black/5"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 pt-4 lg:pt-6">
           <h2 className="text-lg font-semibold tracking-tight">Үзүүлэлтүүд</h2>
           <p className="mt-1 text-sm text-[#8a7d6c]">
             Бүхээгийн зураг төслийн хэмжээс.
